@@ -1,4 +1,5 @@
 import pygame
+print('xdd')
 back = (0,0,0)
 screen = pygame.display.set_mode((500,500))
 screen.fill(back)
