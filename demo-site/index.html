@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Школьный портал — демо для KeyGuard</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="demo-ribbon">
+      <span class="dot"></span>
+      Демо-сайт для проверки расширения KeyGuard. Введите логин и пароль, отправьте форму — расширение предложит сохранить пароль.
+    </div>
+
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="school-logo">
+          <div class="school-mark">10</div>
+          <div>
+            <strong>Школа №10</strong>
+            <span>электронный дневник</span>
+          </div>
+        </div>
+        <nav>
+          <a class="active" href="#login">Вход</a>
+          <a href="#password">Смена пароля</a>
+          <a href="#about">О демо</a>
+        </nav>
+        <div class="sidebar-note">
+          <strong>Это не настоящий сайт.</strong>
+          <p>Данные никуда не отправляются и не сохраняются на сервере.</p>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="hero">
+          <p class="eyebrow">Демо-пространство</p>
+          <h1>Вход в электронный дневник</h1>
+          <p class="lead">Авторизуйтесь, чтобы проверить, как KeyGuard находит форму и подставляет сохранённые данные.</p>
+        </section>
+
+        <div class="grid">
+          <section class="card" id="login">
+            <div class="card-head">
+              <h2>Вход</h2>
+              <span class="badge">Форма №1</span>
+            </div>
+            <form id="login-form" novalidate>
+              <label for="login-email">Логин или e-mail</label>
+              <input id="login-email" name="email" type="email" autocomplete="username" placeholder="student@school10.ru" />
+              <label for="login-password">Пароль</label>
+              <div class="password-wrap">
+                <input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Введите пароль" />
+                <button type="button" class="peek" data-target="login-password" aria-label="Показать пароль">👁</button>
+              </div>
+              <div class="row">
+                <label class="checkbox"><input type="checkbox" checked /> Запомнить меня</label>
+                <a href="#password">Забыли пароль?</a>
+              </div>
+              <button class="primary" type="submit">Войти в дневник</button>
+              <p class="form-note">Отправьте форму — KeyGuard предложит сохранить пароль.</p>
+            </form>
+          </section>
+
+          <section class="card" id="password">
+            <div class="card-head">
+              <h2>Смена пароля</h2>
+              <span class="badge">Форма №2</span>
+            </div>
+            <form id="password-form" novalidate>
+              <label for="change-email">Логин или e-mail</label>
+              <input id="change-email" name="email" type="email" autocomplete="username" placeholder="student@school10.ru" />
+              <label for="current-password">Текущий пароль</label>
+              <input id="current-password" name="current-password" type="password" autocomplete="current-password" placeholder="Текущий пароль" />
+              <label for="new-password">Новый пароль</label>
+              <div class="password-wrap">
+                <input id="new-password" name="new-password" type="password" autocomplete="new-password" placeholder="Минимум 8 символов" />
+                <button type="button" class="peek" data-target="new-password" aria-label="Показать пароль">👁</button>
+              </div>
+              <button class="primary" type="submit">Сохранить новый пароль</button>
+              <p class="form-note">Если в хранилище уже есть логин, KeyGuard предложит обновить запись.</p>
+            </form>
+          </section>
+        </div>
+
+        <section class="card about" id="about">
+          <div class="card-head">
+            <h2>Как проверить KeyGuard</h2>
+            <span class="badge">инструкция</span>
+          </div>
+          <ol>
+            <li>Откройте меню расширений Chrome → «Загрузить распакованное расширение» и выберите папку <code>school</code>.</li>
+            <li>Создайте хранилище в попапе KeyGuard и добавьте запись с логином <code>student@school10.ru</code> и любым паролем.</li>
+            <li>Нажмите на иконку KeyGuard на панели, введите мастер-пароль и откройте сайт <code>http://localhost:8000</code>.</li>
+            <li>Нажмите «Заполнить» в карточке записи или выберите «Заполнить паролем из KeyGuard» в контекстном меню поля пароля.</li>
+            <li>Измените пароль в форме ниже и отправьте её — KeyGuard предложит обновить сохранённую запись.</li>
+          </ol>
+          <p class="about-note">Для проверки используется локальный сервер: расширения не работают на страницах <code>file://</code>.</p>
+        </section>
+
+        <div class="banner" id="demo-banner" hidden></div>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

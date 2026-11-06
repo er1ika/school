@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KeyGuard — интерактивный макет</title>
+    <link rel="stylesheet" href="src/styles.css" />
+    <style>
+      .preview-shell {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 26px 22px 60px;
+      }
+
+      .preview-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+      }
+
+      .preview-header .brand-row {
+        gap: 12px;
+      }
+
+      .preview-header h1 {
+        margin: 0;
+        font-size: 21px;
+        letter-spacing: -0.03em;
+      }
+
+      .preview-header p {
+        margin: 3px 0 0;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+
+      .preview-header-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .preview-layout {
+        display: grid;
+        grid-template-columns: 440px minmax(0, 1fr);
+        gap: 30px;
+        align-items: start;
+      }
+
+      .preview-stage {
+        min-width: 0;
+      }
+
+      .browser-frame {
+        background: #0b1020;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 10px;
+        box-shadow: 0 30px 70px rgba(2, 6, 23, 0.55);
+      }
+
+      .browser-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 2px 4px 10px;
+      }
+
+      .browser-dots {
+        display: flex;
+        gap: 5px;
+        flex: 0 0 auto;
+      }
+
+      .browser-dots i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.18);
+      }
+
+      .browser-dots i:first-child {
+        background: #fb7185;
+      }
+
+      .browser-dots i:nth-child(2) {
+        background: #fbbf24;
+      }
+
+      .browser-dots i:nth-child(3) {
+        background: #34d399;
+      }
+
+      .browser-address {
+        flex: 1;
+        min-width: 0;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        padding: 4px 9px;
+        font-size: 9.5px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .browser-size {
+        font-size: 9px;
+        color: var(--muted-2);
+        flex: 0 0 auto;
+      }
+
+      #popup-frame {
+        display: block;
+        width: 400px;
+        height: 600px;
+        border: 0;
+        border-radius: 12px;
+        background: #080d18;
+        max-width: 100%;
+      }
+
+      .preview-note {
+        margin: 11px 0 0;
+        font-size: 10.5px;
+        color: var(--muted-2);
+        line-height: 1.5;
+      }
+
+      .preview-side {
+        display: flex;
+        flex-direction: column;
+        gap: 13px;
+        min-width: 0;
+      }
+
+      .preview-side h2 {
+        margin: 0 0 8px;
+        font-size: 13.5px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .preview-side h2 svg {
+        width: 14px;
+        height: 14px;
+        color: #c4b5fd;
+      }
+
+      .preview-side ul,
+      .preview-side ol {
+        margin: 0;
+        padding-left: 18px;
+        font-size: 11.5px;
+        color: var(--muted);
+        line-height: 1.65;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .preview-side code {
+        font-family: var(--mono);
+        font-size: 10px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 4px;
+        padding: 1px 4px;
+        color: #ddd6fe;
+      }
+
+      .preview-side .hint {
+        margin-top: 8px;
+      }
+
+      .preview-error {
+        position: fixed;
+        left: 50%;
+        bottom: 20px;
+        transform: translateX(-50%);
+        max-width: calc(100% - 32px);
+        background: #2a1420;
+        border: 1px solid rgba(251, 113, 133, 0.4);
+        color: #fecdd3;
+        border-radius: 12px;
+        padding: 11px 15px;
+        font-size: 11.5px;
+        line-height: 1.5;
+        z-index: 50;
+        box-shadow: 0 16px 40px rgba(2, 6, 23, 0.5);
+      }
+
+      @media (max-width: 900px) {
+        .preview-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .preview-stage {
+          overflow-x: auto;
+          padding-bottom: 6px;
+        }
+
+        .browser-frame {
+          width: 420px;
+          max-width: none;
+        }
+
+        .preview-shell {
+          padding: 18px 14px 50px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 4l3 3M13.5 6.5l3 3"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.2c0 4.5-3 7.6-7 9.3-4-1.7-7-4.8-7-9.3V6l7-3z"/></symbol>
+    </svg>
+
+    <div class="preview-shell">
+      <header class="preview-header">
+        <div class="brand-row">
+          <div class="brand-mark sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8l7.5 3.2v5.6c0 4.8-3.2 8.1-7.5 9.9-4.3-1.8-7.5-5.1-7.5-9.9V6L12 2.8z"/><circle cx="12" cy="10.5" r="1.9" fill="currentColor" stroke="none"/><path d="M12 12.4v3.4" stroke-width="2.1"/></svg>
+          </div>
+          <div>
+            <h1>KeyGuard</h1>
+            <p>Интерактивный макет менеджера паролей</p>
+          </div>
+        </div>
+        <div class="preview-header-actions">
+          <a class="btn btn-ghost btn-sm" href="demo-site/" target="_blank" rel="noopener">Демо-сайт</a>
+          <a class="btn btn-primary btn-sm" href="https://github.com/er1ika/school" target="_blank" rel="noopener">GitHub</a>
+        </div>
+      </header>
+
+      <div class="preview-layout">
+        <section class="preview-stage">
+          <div class="browser-frame">
+            <div class="browser-bar">
+              <span class="browser-dots"><i></i><i></i><i></i></span>
+              <span class="browser-address">keyguard://vault</span>
+              <span class="browser-size">400 × 600</span>
+            </div>
+            <iframe id="popup-frame" title="Интерактивный макет KeyGuard"></iframe>
+          </div>
+          <p class="preview-note">
+            Это демонстрационный макет с выдуманными данными. Он не подключён к настоящему хранилищу и не сохраняет
+            изменения после перезагрузки страницы.
+          </p>
+        </section>
+
+        <aside class="preview-side">
+          <div class="card card-pad">
+            <h2><svg><use href="#i-eye"></use></svg> Что можно посмотреть</h2>
+            <ul>
+              <li>карточки логинов, карт и заметок;</li>
+              <li>поиск и фильтры по категориям;</li>
+              <li>раскрытие и копирование пароля;</li>
+              <li>генератор пароля и оценку надёжности;</li>
+              <li>редактор новой записи и удаление;</li>
+              <li>код двухфакторной аутентификации.</li>
+            </ul>
+          </div>
+
+          <div class="card card-pad">
+            <h2><svg><use href="#i-key"></use></svg> Как установить расширение</h2>
+            <ol>
+              <li>Откройте <code>chrome://extensions</code>.</li>
+              <li>Включите режим разработчика.</li>
+              <li>Нажмите «Загрузить распакованное расширение».</li>
+              <li>Выберите папку <code>school</code> с файлом <code>manifest.json</code>.</li>
+              <li>Создайте хранилище в попапе KeyGuard.</li>
+            </ol>
+            <p class="hint">В макете мастер-пароль не проверяется: подойдёт любой непустой пароль.</p>
+          </div>
+
+          <div class="card card-pad">
+            <h2><svg><use href="#i-shield"></use></svg> Важно</h2>
+            <p class="hint" style="margin: 0">
+              Макет показывает интерфейс, но не использует настоящее шифрование и не сохраняет пароли. Настоящие данные
+              хранятся только в установленном расширении и только в зашифрованном виде.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="preview-error" id="preview-error" hidden></div>
+
+    <script src="preview.js"></script>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "keyguard-password-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "KeyGuard — менеджер паролей в виде расширения для браузера (Manifest V3)",
+  "scripts": {
+    "test": "node tests/run-tests.mjs",
+    "serve:demo": "python3 -m http.server 8000 --directory demo-site",
+    "test:ui": "node tests/ui-smoke.mjs",
+    "serve": "python3 -m http.server 8000"
+  },
+  "devDependencies": {
+    "jsdom": "^31.0.0"
+  }
+}

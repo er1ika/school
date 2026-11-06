@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KeyGuard — настройки</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="options">
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.2c0 4.5-3 7.6-7 9.3-4-1.7-7-4.8-7-9.3V6l7-3z"/></symbol>
+      <symbol id="i-shield-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.2c0 4.5-3 7.6-7 9.3-4-1.7-7-4.8-7-9.3V6l7-3z"/><path d="M9 12l2 2 4-4"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V7.8a4 4 0 018 0v2.7"/><path d="M12 14.5v2.5"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 6.1A9.8 9.8 0 0112 6c6 0 9.5 6 9.5 6a17 17 0 01-3.3 3.9"/><path d="M6.2 7.7A16.6 16.6 0 002.5 12S6 18 12 18a9.7 9.7 0 004.2-.9"/><path d="M9.9 9.9a3 3 0 004.2 4.2"/></symbol>
+      <symbol id="i-wand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20L16.5 7.5"/><path d="M14.5 5.5l1-2 1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/><path d="M19 13l.7-1.4.7 1.4 1.4.7-1.4.7-.7 1.4-.7-1.4-1.4-.7 1.4-.7z"/><path d="M6.5 4.5l.6-1.2.6 1.2 1.2.6-1.2.6-.6 1.2-.6-1.2L5.3 5l1.2-.5z"/></symbol>
+      <symbol id="i-fingerprint" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5a7.5 7.5 0 017.5 7.5v2"/><path d="M4.5 12A7.5 7.5 0 0112 4.5"/><path d="M7 12a5 5 0 0110 0v3.5"/><path d="M9.5 12a2.5 2.5 0 015 0v4.5"/><path d="M12 14.5V19"/><path d="M4.5 15v1.5A3 3 0 007 19.5"/><path d="M19.5 17v.5a3 3 0 01-3 3"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v11M7.5 10.5L12 15l4.5-4.5"/><path d="M4.5 16.5v2a2 2 0 002 2h11a2 2 0 002-2v-2"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5v-11M7.5 8.5L12 4l4.5 4.5"/><path d="M4.5 16.5v2a2 2 0 002 2h11a2 2 0 002-2v-2"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.3"/></symbol>
+      <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 4l3 3M13.5 6.5l3 3"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5L21 20H3L12 3.5z"/><path d="M12 9.5v4.5M12 17.2v.3"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5 10-11"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l.8 12a2 2 0 002 1.9h5.4a2 2 0 002-1.9L17.5 7"/><path d="M10 11v6M14 11v6"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 10-2.3 6.3"/><path d="M20 4v7h-7"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15H4.5A1.5 1.5 0 013 13.5v-9A1.5 1.5 0 014.5 3h9A1.5 1.5 0 0115 4.5V5"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M19 14v4.5a1.5 1.5 0 01-1.5 1.5h-12A1.5 1.5 0 014 18.5v-12A1.5 1.5 0 015.5 5H10"/></symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.5 2.3 3.8 5.3 3.8 8.5s-1.3 6.2-3.8 8.5c-2.5-2.3-3.8-5.3-3.8-8.5S9.5 5.8 12 3.5z"/></symbol>
+    </svg>
+
+    <div class="options-shell">
+      <header class="options-header">
+        <div class="brand-row">
+          <div class="brand-mark sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8l7.5 3.2v5.6c0 4.8-3.2 8.1-7.5 9.9-4.3-1.8-7.5-5.1-7.5-9.9V6L12 2.8z"/><circle cx="12" cy="10.5" r="1.9" fill="currentColor" stroke="none"/><path d="M12 12.4v3.4" stroke-width="2.1"/></svg>
+          </div>
+          <div>
+            <h1>KeyGuard</h1>
+            <p>Настройки и безопасность хранилища</p>
+          </div>
+        </div>
+        <div class="options-header-actions">
+          <span class="status-pill" id="status-pill"><span class="status-dot"></span><span id="status-text">Проверка…</span></span>
+          <button class="btn btn-ghost btn-sm" id="btn-lock">
+            <svg><use href="#i-lock"></use></svg>
+            Заблокировать
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-open-popup">
+            <svg><use href="#i-key"></use></svg>
+            Открыть хранилище
+          </button>
+        </div>
+      </header>
+
+      <div class="locked-banner" id="locked-banner" hidden>
+        <span id="locked-banner-text">Хранилище заблокировано. Откройте попап KeyGuard и введите мастер-пароль.</span>
+        <button class="btn btn-ghost btn-sm" id="btn-banner-popup">Открыть попап</button>
+      </div>
+
+      <div class="options-layout">
+        <nav class="nav" aria-label="Разделы настроек">
+          <button class="active" data-tab="security">
+            <svg><use href="#i-shield"></use></svg>
+            Безопасность
+          </button>
+          <button data-tab="generator">
+            <svg><use href="#i-wand"></use></svg>
+            Генератор
+          </button>
+          <button data-tab="audit">
+            <svg><use href="#i-fingerprint"></use></svg>
+            Аудит паролей
+          </button>
+          <button data-tab="data">
+            <svg><use href="#i-download"></use></svg>
+            Данные
+          </button>
+          <div class="nav-sep"></div>
+          <button data-tab="about">
+            <svg><use href="#i-info"></use></svg>
+            О проекте
+          </button>
+        </nav>
+
+        <main>
+          <!-- Безопасность -->
+          <section class="panel active" id="panel-security">
+            <div class="panel-head">
+              <h2>Безопасность</h2>
+              <p>Настройте автоматическую блокировку и защиту буфера обмена. Изменения применяются сразу.</p>
+            </div>
+            <div class="panel-stack">
+              <div class="card card-pad">
+                <h3 class="card-title"><svg><use href="#i-lock"></use></svg> Автоблокировка</h3>
+                <p class="card-sub">Ключ шифрования стирается из памяти, и для доступа снова нужен мастер-пароль.</p>
+                <div class="setting-row">
+                  <div>
+                    <h3>Блокировать через</h3>
+                    <p>Время бездействия, после которого хранилище закроется.</p>
+                  </div>
+                  <div class="setting-control">
+                    <select class="select" id="auto-lock">
+                      <option value="1">1 минуту</option>
+                      <option value="2">2 минуты</option>
+                      <option value="5">5 минут</option>
+                      <option value="10">10 минут</option>
+                      <option value="15">15 минут</option>
+                      <option value="30">30 минут</option>
+                      <option value="60">60 минут</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <h3>Блокировать при простое системы</h3>
+                    <p>Использует Chrome Idle API: если компьютер не используется, хранилище закроется.</p>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="lock-on-idle" />
+                    <span></span>
+                  </label>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <h3>Очищать буфер обмена</h3>
+                    <p>После копирования пароля буфер обмена очищается автоматически.</p>
+                  </div>
+                  <div class="setting-control">
+                    <select class="select" id="clipboard-clear">
+                      <option value="15">через 15 секунд</option>
+                      <option value="30">через 30 секунд</option>
+                      <option value="60">через 60 секунд</option>
+                      <option value="120">через 2 минуты</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <h3>Проверка утечек</h3>
+                    <p>Показывать кнопку проверки пароля по базе Have I Been Pwned в редакторе.</p>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="breach-check" />
+                    <span></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="card card-pad">
+                <h3 class="card-title"><svg><use href="#i-key"></use></svg> Мастер-пароль</h3>
+                <p class="card-sub">При смене мастер-пароля генерируется новая соль и заново шифруются все записи.</p>
+                <form id="change-password-form" class="form-grid" novalidate>
+                  <div class="form-row">
+                    <div>
+                      <label class="lbl" for="current-password">Текущий пароль</label>
+                      <div class="field">
+                        <input id="current-password" type="password" placeholder="Текущий мастер-пароль" autocomplete="current-password" />
+                        <div class="suffix"><button type="button" data-toggle-password="current-password" aria-label="Показать пароль"><svg><use href="#i-eye"></use></svg></button></div>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="lbl" for="new-password">Новый пароль</label>
+                      <div class="field">
+                        <input id="new-password" type="password" placeholder="Минимум 8 символов" autocomplete="new-password" />
+                        <div class="suffix"><button type="button" data-toggle-password="new-password" aria-label="Показать пароль"><svg><use href="#i-eye"></use></svg></button></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="lbl" for="new-password-confirm">Повторите новый пароль</label>
+                    <div class="field">
+                      <input id="new-password-confirm" type="password" placeholder="Ещё раз" autocomplete="new-password" />
+                      <div class="suffix"><button type="button" data-toggle-password="new-password-confirm" aria-label="Показать пароль"><svg><use href="#i-eye"></use></svg></button></div>
+                    </div>
+                  </div>
+                  <div class="strength" id="change-strength"><span></span><span></span><span></span><span></span></div>
+                  <div class="strength-label"><span id="change-strength-label">Надёжность нового пароля</span><span id="change-entropy"></span></div>
+                  <p class="error" id="change-error" hidden></p>
+                  <p class="success" id="change-success" hidden></p>
+                  <button class="btn btn-primary" type="submit" id="change-submit">Сменить мастер-пароль</button>
+                </form>
+              </div>
+
+              <div class="card card-pad">
+                <h3 class="card-title"><svg><use href="#i-shield-check"></use></svg> Как это работает</h3>
+                <p class="card-sub">Коротко о криптографии, которая защищает хранилище.</p>
+                <div class="about-grid">
+                  <div class="about-item">
+                    <h4><svg><use href="#i-key"></use></svg> PBKDF2-SHA256</h4>
+                    <p>Мастер-пароль превращается в ключ через <code>310 000</code> итераций. Это делает перебор медленным.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4><svg><use href="#i-lock"></use></svg> AES-256-GCM</h4>
+                    <p>Все записи шифруются симметричным алгоритмом. Каждое шифрование использует новый случайный IV.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4><svg><use href="#i-fingerprint"></use></svg> Соль и verifier</h4>
+                    <p>Соль случайная и хранится в открытом виде. Verifier позволяет проверить пароль без сохранения ключа.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4><svg><use href="#i-shield"></use></svg> Ключ в памяти</h4>
+                    <p>Ключ живёт в <code>chrome.storage.session</code> и стирается при блокировке или перезапуске браузера.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Генератор -->
+          <section class="panel" id="panel-generator">
+            <div class="panel-head">
+              <h2>Генератор паролей</h2>
+              <p>Настройки по умолчанию для генератора в попапе и редакторе записей.</p>
+            </div>
+            <div class="panel-stack">
+              <div class="card card-pad">
+                <div class="gen-display">
+                  <div class="gen-password" id="options-gen-password"></div>
+                  <div class="gen-actions">
+                    <button class="icon-btn" id="options-gen-refresh" title="Сгенерировать заново"><svg><use href="#i-refresh"></use></svg></button>
+                    <button class="icon-btn" id="options-gen-copy" title="Скопировать"><svg><use href="#i-copy"></use></svg></button>
+                  </div>
+                </div>
+                <div class="strength" id="options-gen-strength"><span></span><span></span><span></span><span></span></div>
+                <div class="strength-label"><span id="options-gen-label">Надёжность</span><span id="options-gen-entropy"></span></div>
+
+                <div style="margin-top: 16px">
+                  <div class="gen-row">
+                    <span class="lbl">Длина пароля</span>
+                    <span class="length-value" id="options-gen-length-value">20</span>
+                  </div>
+                  <input type="range" class="range" id="options-gen-length" min="8" max="64" value="20" />
+                </div>
+                <div class="gen-row">
+                  <span class="lbl">Строчные буквы (a-z)</span>
+                  <label class="switch"><input type="checkbox" id="gen-lower" checked /><span></span></label>
+                </div>
+                <div class="gen-row">
+                  <span class="lbl">Заглавные буквы (A-Z)</span>
+                  <label class="switch"><input type="checkbox" id="gen-upper" checked /><span></span></label>
+                </div>
+                <div class="gen-row">
+                  <span class="lbl">Цифры (0-9)</span>
+                  <label class="switch"><input type="checkbox" id="gen-digits" checked /><span></span></label>
+                </div>
+                <div class="gen-row">
+                  <span class="lbl">Символы (!@#$…)</span>
+                  <label class="switch"><input type="checkbox" id="gen-symbols" checked /><span></span></label>
+                </div>
+                <div class="gen-row">
+                  <span class="lbl">Без похожих символов (Il1O0o)</span>
+                  <label class="switch"><input type="checkbox" id="gen-ambiguous" checked /><span></span></label>
+                </div>
+                <div class="modal-actions">
+                  <button class="btn btn-ghost" id="options-gen-reset">Сбросить</button>
+                  <button class="btn btn-primary" id="options-gen-save"><svg><use href="#i-check"></use></svg> Сохранить настройки</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Аудит -->
+          <section class="panel" id="panel-audit">
+            <div class="panel-head">
+              <h2>Аудит паролей</h2>
+              <p>Проверка хранилища на слабые, повторно используемые и устаревшие пароли. Данные не покидают браузер.</p>
+            </div>
+            <div class="audit-grid">
+              <div class="stat danger"><b id="stat-weak">0</b><span>слабых паролей</span></div>
+              <div class="stat warning"><b id="stat-reused">0</b><span>повторно используемых</span></div>
+              <div class="stat"><b id="stat-old">0</b><span>старше 180 дней</span></div>
+            </div>
+            <div class="card card-pad">
+              <div class="setting-row">
+                <div>
+                  <h3>Результаты проверки</h3>
+                  <p>Нажмите «Обновить», чтобы пересчитать после изменения записей.</p>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="audit-refresh"><svg><use href="#i-refresh"></use></svg> Обновить</button>
+              </div>
+              <div style="margin-top: 14px">
+                <div class="setting-row" style="padding-top: 0">
+                  <h3 style="margin: 0">Слабые пароли</h3>
+                  <span class="badge danger" id="badge-weak">0</span>
+                </div>
+                <div class="audit-list" id="list-weak"></div>
+              </div>
+              <div style="margin-top: 14px">
+                <div class="setting-row" style="padding-top: 0">
+                  <h3 style="margin: 0">Повторно используемые</h3>
+                  <span class="badge warning" id="badge-reused">0</span>
+                </div>
+                <div class="audit-list" id="list-reused"></div>
+              </div>
+              <div style="margin-top: 14px">
+                <div class="setting-row" style="padding-top: 0">
+                  <h3 style="margin: 0">Устаревшие пароли</h3>
+                  <span class="badge" id="badge-old">0</span>
+                </div>
+                <div class="audit-list" id="list-old"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Данные -->
+          <section class="panel" id="panel-data">
+            <div class="panel-head">
+              <h2>Данные</h2>
+              <p>Резервные копии и управление хранилищем.</p>
+            </div>
+            <div class="panel-stack">
+              <div class="card card-pad">
+                <h3 class="card-title"><svg><use href="#i-download"></use></svg> Экспорт резервной копии</h3>
+                <p class="card-sub">Файл уже зашифрован вашим мастер-паролем. Его можно перенести на другой компьютер и импортировать в KeyGuard.</p>
+                <button class="btn btn-ghost" id="btn-export"><svg><use href="#i-download"></use></svg> Скачать зашифрованный бэкап</button>
+              </div>
+
+              <div class="card card-pad">
+                <h3 class="card-title"><svg><use href="#i-upload"></use></svg> Импорт резервной копии</h3>
+                <p class="card-sub">Выберите файл KeyGuard и введите мастер-пароль, который был у копии. Текущее хранилище будет заменено.</p>
+                <input type="file" id="import-file" class="file-input" accept="application/json,.json" />
+                <label class="btn btn-ghost file-label" for="import-file"><svg><use href="#i-upload"></use></svg> Выбрать файл</label>
+                <p class="hint" id="import-file-name" style="margin-top: 8px"></p>
+              </div>
+
+              <div class="card card-pad danger-zone">
+                <h3 class="card-title" style="color: #fecdd3"><svg><use href="#i-alert"></use></svg> Опасная зона</h3>
+                <p class="card-sub">Полное удаление хранилища и настроек. Отменить это действие невозможно.</p>
+                <button class="btn btn-danger" id="btn-reset"><svg><use href="#i-trash"></use></svg> Удалить хранилище</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- О проекте -->
+          <section class="panel" id="panel-about">
+            <div class="panel-head">
+              <h2>О проекте</h2>
+              <p>KeyGuard — менеджер паролей в виде расширения для браузера. Учебный проект для 10 класса.</p>
+            </div>
+            <div class="panel-stack">
+              <div class="card card-pad">
+                <h3 class="card-title"><svg><use href="#i-info"></use></svg> Что умеет KeyGuard</h3>
+                <div class="about-grid" style="margin-top: 12px">
+                  <div class="about-item">
+                    <h4><svg><use href="#i-lock"></use></svg> Шифрование</h4>
+                    <p>Мастер-пароль, PBKDF2 и AES-256-GCM. В хранилище браузера попадают только зашифрованные данные.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4><svg><use href="#i-key"></use></svg> Автозаполнение</h4>
+                    <p>Расширение находит форму логина на странице и подставляет сохранённые данные по команде.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4><svg><use href="#i-wand"></use></svg> Генератор</h4>
+                    <p>Криптостойкие пароли нужной длины с настройкой наборов символов и оценкой надёжности.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4><svg><use href="#i-fingerprint"></use></svg> TOTP и аудит</h4>
+                    <p>Коды двухфакторной аутентификации и проверка слабых, повторных и старых паролей.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4><svg><use href="#i-shield-check"></use></svg> Проверка утечек</h4>
+                    <p>Проверка по базе Have I Been Pwned через k-anonymity: серверу уходит только 5 символов SHA-1.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4><svg><use href="#i-globe"></use></svg> Резервные копии</h4>
+                    <p>Экспорт и импорт зашифрованного файла для переноса хранилища между устройствами.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card card-pad">
+                <h3 class="card-title"><svg><use href="#i-shield"></use></svg> Какие разрешения используются</h3>
+                <div class="about-grid" style="margin-top: 12px">
+                  <div class="about-item">
+                    <h4>storage</h4>
+                    <p>Хранение зашифрованного хранилища и настроек. Открытый текст не сохраняется.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4>activeTab, scripting</h4>
+                    <p>Заполнение формы на активной вкладке по явному действию пользователя.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4>clipboardWrite</h4>
+                    <p>Копирование паролей и последующая очистка буфера обмена.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4>idle, alarms</h4>
+                    <p>Автоматическая блокировка при простое и по таймеру.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4>host_permissions</h4>
+                    <p>Доступ к сайтам для автозаполнения и к API Have I Been Pwned для проверки утечек.</p>
+                  </div>
+                  <div class="about-item">
+                    <h4>contextMenus</h4>
+                    <p>Пункт «Заполнить паролем из KeyGuard» в контекстном меню страницы.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card card-pad">
+                <h3 class="card-title"><svg><use href="#i-info"></use></svg> Ограничения проекта</h3>
+                <p class="card-sub" style="margin-bottom: 0">
+                  KeyGuard — учебный проект, а не сертифицированный менеджер паролей. Нет облачной синхронизации и
+                  восстановления мастер-пароля: если его забыть, данные не восстановить. Автозаполнение работает на
+                  сайтах с обычной формой логина и может не сработать на нестандартных формах. Проверка утечек требует
+                  доступа к интернету. Для реального использования стоит выбрать проверенное решение с открытым кодом.
+                </p>
+              </div>
+
+              <div class="card card-pad">
+                <h3 class="card-title"><svg><use href="#i-check"></use></svg> Технологии</h3>
+                <div class="about-grid" style="margin-top: 12px">
+                  <div class="about-item"><h4>Manifest V3</h4><p>Актуальная модель расширений Chrome: service worker и минимальные права.</p></div>
+                  <div class="about-item"><h4>Web Crypto API</h4><p>Встроенные криптографические функции браузера: PBKDF2, AES-GCM, SHA-1, HMAC.</p></div>
+                  <div class="about-item"><h4>Chrome Extension API</h4><p>storage, idle, alarms, contextMenus, scripting и tabs.</p></div>
+                  <div class="about-item"><h4>Без библиотек</h4><p>Интерфейс и логика написаны на чистом HTML, CSS и JavaScript.</p></div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <div id="modal-root"></div>
+    <div class="toast-root" id="toast-root"></div>
+
+    <script src="lib/crypto.js"></script>
+    <script src="lib/generator.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>
