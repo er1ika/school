@@ -9,17 +9,39 @@
  * Мастер-пароль и ключ никогда не сохраняются в открытом виде на диск.
  * Соль и IV генерируются криптостойким ГСЧ на каждое шифрование.
  */
+  /* =====================================================================
+     КАК ЧИТАТЬ ЭТОТ ФАЙЛ
+     ---------------------------------------------------------------------
+     1. Утилиты: байты ↔ base64, случайные байты, сравнение строк.
+     2. PBKDF2: превращаем мастер-пароль в ключ AES-256.
+     3. AES-GCM: шифруем и расшифровываем строки и JSON.
+     4. createVault / unlockVault / persistVault / rekeyVault:
+        создание, открытие, сохранение и смена пароля.
+     5. sha1Hex: нужен только для проверки утечек (HIBP).
+
+     Главная мысль: мастер-пароль не хранится. Из него получается ключ,
+     ключ шифрует данные. Без пароля данные не расшифровать.
+     ===================================================================== */
 (() => {
   'use strict';
 
-  const ITERATIONS = 310000;
-  const VERIFIER_PLAINTEXT = 'keyguard::vault-verifier::v1';
-  const textEncoder = new TextEncoder();
-  const textDecoder = new TextDecoder();
+  /* --- Настройки и константы ---------------------------------------- */
 
+  // Сколько раз PBKDF2 «перемешивает» пароль. Больше итераций = медленнее
+  // перебор, но и вход в хранилище занимает немного больше времени.
+  const ITERATIONS = 310000;  // сколько раз повторяем PBKDF2
+  const VERIFIER_PLAINTEXT = 'keyguard::vault-verifier::v1';  // известная строка для проверки пароля
+  const textEncoder = new TextEncoder();  // строка → байты UTF-8
+  const textDecoder = new TextDecoder();  // байты → строка
+
+  /* --- 1. Утилиты для байтов и base64 -------------------------------- */
+
+  // Chrome storage хранит текст, а не Uint8Array. Поэтому байты ключей,
+  // соли и IV переводим в base64 — это просто способ «записать байты текстом».
+  // Декодирование base64 обратно в байты делает base64ToBytes ниже.
   function bytesToBase64(bytes) {
     let binary = '';
-    const chunk = 0x8000;
+    const chunk = 0x8000;  // кусками по 32 КБ, чтобы не переполнить строку
     for (let i = 0; i < bytes.length; i += chunk) {
       binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
     }
@@ -33,9 +55,11 @@
     return bytes;
   }
 
+  // Криптостойкий генератор случайных чисел. Его нельзя заменять на Math.random():
+  // для соли и IV нужна настоящая случайность.
   function randomBytes(length) {
     const bytes = new Uint8Array(length);
-    crypto.getRandomValues(bytes);
+    crypto.getRandomValues(bytes);  // заполняем массив случайными байтами
     return bytes;
   }
 
@@ -47,6 +71,9 @@
     return base64ToBytes(value);
   }
 
+  // Сравниваем строки за примерно одинаковое время. Обычное a === b
+  // останавливается на первом различии и может «выдать» информацию
+  // о том, сколько символов совпало. Здесь мы сравниваем все символы.
   function timingSafeEqual(a, b) {
     if (typeof a !== 'string' || typeof b !== 'string') return false;
     if (a.length !== b.length) return false;
@@ -55,6 +82,11 @@
     return diff === 0;
   }
 
+  /* --- 2. PBKDF2: мастер-пароль → ключ ------------------------------- */
+
+  // PBKDF2 — это функция, которая много раз повторяет хеширование пароля
+  // вместе с солью. На выходе получается 256-битный ключ для AES-GCM.
+  // Соль нужна, чтобы одинаковые пароли давали разные ключи.
   /**
    * Производит ключ AES-256-GCM из мастер-пароля и соли.
    * @param {string} password
@@ -65,7 +97,7 @@
   async function deriveKey(password, saltBase64, iterations = ITERATIONS) {
     const baseKey = await crypto.subtle.importKey(
       'raw',
-      textEncoder.encode(password.normalize('NFKC')),
+      textEncoder.encode(password.normalize('NFKC')),  // NFKC — приводим Unicode-формы к одному виду
       'PBKDF2',
       false,
       ['deriveKey']
@@ -84,6 +116,14 @@
     );
   }
 
+  /* --- 3. Ключ в session storage ------------------------------------ */
+
+  // Ключ нужен service worker'у, чтобы расшифровывать записи.
+  // Chrome может перезапускать service worker, поэтому ключ на время
+  // сохраняется в chrome.storage.session. Это память вкладки/браузера:
+  // она стирается при перезапуске браузера и при блокировке.
+  // ВАЖНО: session storage — это не диск, но и не «секретное хранилище».
+  // Поэтому ключ стирается при блокировке и не хранится в local storage.
   async function exportKey(key) {
     const raw = await crypto.subtle.exportKey('raw', key);
     return toBase64(raw);
@@ -96,8 +136,15 @@
     ]);
   }
 
+  /* --- 4. AES-GCM: шифрование строк и JSON --------------------------- */
+
+  // AES-GCM — симметричный алгоритм. Один и тот же ключ и шифрует, и
+  // расшифровывает. IV (initialization vector) — случайное «начальное
+  // состояние»; оно не секретное, но должно быть новым для каждого шифрования.
+  // GCM также проверяет целостность: если шифротекст изменили, расшифровка
+  // упадёт с ошибкой.
   async function encryptString(key, plaintext) {
-    const iv = randomBytes(12);
+    const iv = randomBytes(12);  // 12 байт — стандартная длина IV для GCM
     const ciphertext = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv },
       key,
@@ -124,6 +171,11 @@
     return JSON.parse(await decryptString(key, payload));
   }
 
+  /* --- 5. Структура хранилища --------------------------------------- */
+
+  // В памяти (и в зашифрованном виде) хранилище — это объект:
+  // { version, entries: [...], createdAt }.
+  // Каждая запись — логин, карта или заметка.
   function emptyVault() {
     return {
       version: 1,
@@ -137,12 +189,14 @@
    * @param {string} password мастер-пароль
    * @returns {Promise<{key: CryptoKey, record: object, vault: object}>}
    */
+  // Создание хранилища: генерируем соль, получаем ключ, шифруем пустой
+  // словарь и verifier. Полученный record можно сохранять в chrome.storage.
   async function createVault(password) {
-    const salt = toBase64(randomBytes(16));
+    const salt = toBase64(randomBytes(16));  // 16 случайных байт — соль
     const key = await deriveKey(password, salt, ITERATIONS);
     const now = new Date().toISOString();
     const vault = emptyVault();
-    const verifier = await encryptString(key, VERIFIER_PLAINTEXT);
+    const verifier = await encryptString(key, VERIFIER_PLAINTEXT);  // проверочный маркер
     const data = await encryptJson(key, vault);
     return {
       key,
@@ -165,6 +219,8 @@
    * @param {object} record
    * @returns {Promise<{key: CryptoKey, vault: object}>}
    */
+  // Открытие хранилища: сначала проверяем пароль по verifier, и только
+  // потом расшифровываем данные. Так неверный пароль не «шумит» в данных.
   async function unlockVault(password, record) {
     if (!record || !record.salt || !record.verifier || !record.data) {
       throw new Error('Некорректный формат хранилища');
@@ -177,7 +233,7 @@
     } catch (error) {
       throw new Error('Неверный мастер-пароль');
     }
-    if (!timingSafeEqual(verifier, VERIFIER_PLAINTEXT)) {
+    if (!timingSafeEqual(verifier, VERIFIER_PLAINTEXT)) {  // сравниваем без утечки времени
       throw new Error('Неверный мастер-пароль');
     }
     const vault = await decryptJson(key, record.data);
@@ -190,6 +246,8 @@
   /**
    * Перешифровывает хранилище и возвращает обновлённую запись.
    */
+  // Сохранение: заново шифруем весь словарь записей. Новый IV каждый раз,
+  // поэтому одинаковые данные дают разный шифротекст.
   async function persistVault(key, record, vault) {
     const now = new Date().toISOString();
     const data = await encryptJson(key, vault);
@@ -203,6 +261,8 @@
   /**
    * Смена мастер-пароля: новый ключ, новая соль, заново шифруются все данные.
    */
+  // Смена мастер-пароля: создаём новую соль и новый ключ, заново шифруем
+  // все записи. Старый ключ и старый шифротекст больше не используются.
   async function rekeyVault(record, vault, newPassword) {
     const salt = toBase64(randomBytes(16));
     const key = await deriveKey(newPassword, salt, ITERATIONS);
@@ -223,6 +283,11 @@
     };
   }
 
+  /* --- 6. SHA-1 только для проверки утечек --------------------------- */
+
+  // SHA-1 здесь не используется для защиты паролей! Он нужен, чтобы
+  // отправить в Have I Been Pwned только первые 5 символов хеша.
+  // Сам пароль никуда не уходит.
   async function sha1Hex(text) {
     const digest = await crypto.subtle.digest('SHA-1', textEncoder.encode(text));
     return [...new Uint8Array(digest)]
@@ -231,6 +296,10 @@
       .toUpperCase();
   }
 
+  /* --- Что отдаём наружу --------------------------------------------- */
+
+  // Остальные файлы (background, popup, options) обращаются к этим функциям
+  // через globalThis.KeyGuardCrypto. Так код разбит на независимые модули.
   globalThis.KeyGuardCrypto = {
     ITERATIONS,
     VERIFIER_PLAINTEXT,

@@ -4,26 +4,48 @@
 (() => {
   'use strict';
 
+  /* =====================================================================
+     КАК ЧИТАТЬ ЭТОТ ФАЙЛ
+     ---------------------------------------------------------------------
+     popup.js отвечает за окно, которое открывается по клику на иконку.
+     1. Утилиты: экранирование, тосты, копирование, общение с background.
+     2. Состояние и переключение экранов (блокировка / хранилище / запись).
+     3. Список записей: фильтры, поиск, карточки.
+     4. Детальная карточка: пароль, карта, TOTP.
+     5. Редактор записи и генератор паролей.
+     6. Подтверждение удаления и обработчики событий.
+
+     Пароли в этом файле не хранятся: интерфейс получает их из background
+     через chrome.runtime.sendMessage и сразу показывает/копирует.
+     ===================================================================== */
+
+  /* --- 1. Короткие помощники и утилиты ------------------------------- */
+
+  // $ и $$ — сокращения для querySelector / querySelectorAll.
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
+  // Всё состояние интерфейса в одном объекте. Так проще понимать,
+  // что именно меняется при кликах.
   const state = {
     hasVault: false,
     unlocked: false,
-    settings: null,
-    entries: [],
-    filter: 'all',
-    query: '',
+    settings: null,  // настройки из background
+    entries: [],  // записи, полученные из background
+    filter: 'all',  // текущий фильтр: all/favorite/login/card/note
+    query: '',  // строка поиска
     currentEntryId: null,
     editingEntryId: null,
-    currentEntry: null,
+    currentEntry: null,  // запись, открытая в детальной карточке
     currentTotpCode: '',
-    totpTimer: null,
+    totpTimer: null,  // таймер обновления TOTP-кода
     generatorOptions: null,
     generatorPassword: '',
     lastTouch: 0
   };
 
+  // Палитра аватарок. Цвет выбирается по названию записи (hashString),
+  // поэтому у одной и той же записи он всегда одинаковый.
   const GRADIENTS = [
     'linear-gradient(135deg, #8b5cf6, #6366f1)',
     'linear-gradient(135deg, #06b6d4, #3b82f6)',
@@ -35,20 +57,25 @@
     'linear-gradient(135deg, #14b8a6, #84cc16)'
   ];
 
+  // Подписи для типов записей.
   const TYPE_LABELS = { login: 'Логин', card: 'Карта', note: 'Заметка' };
 
   /* ------------------------------ Утилиты ------------------------------- */
 
+  // Возвращает HTML-иконку из SVG-спрайта в popup.html.
   function icon(name) {
     return `<svg aria-hidden="true"><use href="#i-${name}"></use></svg>`;
   }
 
+  // Экранирование перед вставкой в innerHTML — защита от XSS
+  // через название записи или заметку.
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, (char) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[char]));
   }
 
+  // Простейший хеш строки: одинаковое название → одинаковый цвет аватарки.
   function hashString(value) {
     let hash = 0;
     for (let i = 0; i < String(value).length; i += 1) {
@@ -57,15 +84,18 @@
     return hash;
   }
 
+  // CSS-стиль для аватарки записи.
   function avatarStyle(title) {
     return `background: ${GRADIENTS[hashString(title) % GRADIENTS.length]}`;
   }
 
+  // Первая буква названия для аватарки.
   function avatarLetter(title) {
     const clean = String(title || '?').trim();
     return (clean[0] || '?').toUpperCase();
   }
 
+  // Из URL достаём домен: https://www.example.com/login → example.com.
   function hostFromUrl(url) {
     try {
       return new URL(url).hostname.replace(/^www\./, '');
@@ -74,6 +104,7 @@
     }
   }
 
+  // Красивый короткий вид ссылки для карточки.
   function prettyUrl(url) {
     try {
       const parsed = new URL(url);
@@ -83,11 +114,13 @@
     }
   }
 
+  // Добавляем https://, если пользователь ввёл сайт без схемы.
   function normalizeUrl(url) {
     if (!url) return '';
     return /^https?:\/\//i.test(url) ? url : `https://${url}`;
   }
 
+  // Дата в формате «5 нояб. 2026 г.».
   function formatDate(iso) {
     if (!iso) return '—';
     const date = new Date(iso);
@@ -95,6 +128,7 @@
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
+  // Русские склонения: 1 запись, 2 записи, 5 записей.
   function plural(count, one, few, many) {
     const mod10 = count % 10;
     const mod100 = count % 100;
@@ -103,16 +137,19 @@
     return many;
   }
 
+  // Скрываем пароль точками.
   function maskValue(value) {
     const length = Math.min(Math.max(String(value || '').length, 8), 24);
     return '•'.repeat(length);
   }
 
+  // Показываем только последние 4 цифры карты.
   function maskCardNumber(value) {
     const digits = String(value || '').replace(/\s/g, '');
     return `•••• •••• •••• ${digits.slice(-4) || '••••'}`;
   }
 
+  // Всплывающее уведомление внизу окна.
   function toast(message, type = '') {
     const root = $('#toast-root');
     const node = document.createElement('div');
@@ -122,6 +159,9 @@
     setTimeout(() => node.remove(), 2600);
   }
 
+  // Главный «мостик» к background. Оборачиваем callback API в Promise.
+  // Если background вернул { ok: false }, превращаем это в ошибку,
+  // чтобы вызывающий код мог поймать её через try/catch.
   function send(type, payload = {}) {
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ type, ...payload }, (response) => {
@@ -134,6 +174,7 @@
     });
   }
 
+  // Копирование в буфер обмена + просьба очистить его через N секунд.
   async function copyText(text, label = 'Скопировано') {
     if (!text) return;
     try {
@@ -162,16 +203,21 @@
     }
   }
 
+  /* --- 2. Экраны и состояние ----------------------------------------- */
+
+  // Показываем один из экранов: lock / vault / detail.
   function showScreen(name) {
     $$('.screen').forEach((screen) => {
       screen.hidden = screen.id !== `screen-${name}`;
     });
   }
 
+  // Закрыть модальное окно (редактор, генератор, подтверждение).
   function closeModal() {
     $('#modal-root').innerHTML = '';
   }
 
+  // Открыть сайт записи в новой вкладке.
   function openUrl(url) {
     if (!url) return;
     try {
@@ -183,6 +229,8 @@
 
   /* --------------------------- Состояние/экраны -------------------------- */
 
+  // Спросить у background: есть ли хранилище и разблокировано ли оно.
+  // От этого зависит, какой экран показать.
   async function refreshState() {
     try {
       const response = await send('GET_STATE');
@@ -200,6 +248,7 @@
     }
   }
 
+  // Экран блокировки: либо создание хранилища, либо ввод пароля.
   function showLockScreen() {
     closeModal();
     stopTotp();
@@ -221,6 +270,7 @@
     }
   }
 
+  // Загрузить записи из background и отрисовать список.
   async function loadEntries() {
     try {
       const response = await send('GET_ENTRIES');
@@ -233,8 +283,11 @@
     }
   }
 
+  /* --- 3. Список записей --------------------------------------------- */
+
+  // Применяем фильтр по типу и поисковую строку.
   function filteredEntries() {
-    const query = state.query.trim().toLowerCase();
+    const query = state.query.trim().toLowerCase();  // поиск без учёта регистра
     return state.entries.filter((entry) => {
       if (state.filter === 'favorite' && !entry.favorite) return false;
       if (['login', 'card', 'note'].includes(state.filter) && entry.type !== state.filter) return false;
@@ -252,6 +305,7 @@
     });
   }
 
+  // Вторая строка карточки: логин, маска карты или начало заметки.
   function entrySubtitle(entry) {
     if (entry.type === 'card') {
       const digits = String(entry.card?.number || '').replace(/\s/g, '');
@@ -264,6 +318,8 @@
     return entry.username || hostFromUrl(entry.url) || 'Логин';
   }
 
+  // Отрисовка списка. Внутри — только HTML-строки, без обработчиков:
+  // клики ловим одним делегированным обработчиком ниже.
   function renderEntries() {
     const list = $('#entries-list');
     const empty = $('#empty-state');
@@ -274,7 +330,7 @@
       ? `${count} ${plural(count, 'запись', 'записи', 'записей')} · зашифровано`
       : 'Хранилище зашифровано';
 
-    if (count === 0) {
+    if (count === 0) {  // пустое хранилище
       list.innerHTML = '';
       list.hidden = true;
       empty.hidden = false;
@@ -284,7 +340,7 @@
       return;
     }
 
-    if (entries.length === 0) {
+    if (entries.length === 0) {  // ничего не найдено по фильтру
       list.innerHTML = '';
       list.hidden = true;
       empty.hidden = false;
@@ -328,6 +384,9 @@
 
   /* ------------------------------ Детали -------------------------------- */
 
+  /* --- 4. Детальная карточка ----------------------------------------- */
+
+  // Обычная строка «подпись — значение» с кнопкой копирования.
   function detailRow(label, valueHtml, copyField, extraClass = '') {
     return `
       <div class="field-row">
@@ -340,6 +399,8 @@
     `;
   }
 
+  // Строка с секретом: пароль, номер карты или CVV.
+  // По умолчанию показываем маску, раскрываем по кнопке «глаз».
   function secretRow(label, field, displayValue) {
     return `
       <div class="field-row">
@@ -353,10 +414,11 @@
     `;
   }
 
+  // Полная карточка записи: аватарка, поля, TOTP, заметки.
   function renderDetail(entry) {
     state.currentEntry = entry;
     $('#detail-crumb').textContent = entry.title;
-    const favoriteUse = $('#btn-detail-favorite use');
+    const favoriteUse = $('#btn-detail-favorite use');  // меняем иконку «звёздочки»
     favoriteUse.setAttribute('href', entry.favorite ? '#i-star-fill' : '#i-star');
     $('#btn-detail-favorite').style.color = entry.favorite ? '#fbbf24' : '';
 
@@ -433,6 +495,7 @@
     startTotp(entry);
   }
 
+  // Открыть карточку записи по id.
   function openDetail(id) {
     const entry = state.entries.find((item) => item.id === id);
     if (!entry) return;
@@ -441,6 +504,7 @@
     showScreen('detail');
   }
 
+  // Значение поля по имени — нужно для кнопок «Скопировать».
   function getFieldValue(field) {
     const entry = state.currentEntry;
     if (!entry) return '';
@@ -457,6 +521,7 @@
     }
   }
 
+  // Показать/скрыть секретное значение.
   function toggleSecret(field, button) {
     const valueNode = $(`[data-secret="${field}"]`);
     if (!valueNode) return;
@@ -479,12 +544,16 @@
 
   /* ------------------------------- TOTP --------------------------------- */
 
+  /* --- 5. TOTP-код --------------------------------------------------- */
+
+  // Останавливаем таймер, когда уходим с карточки.
   function stopTotp() {
     if (state.totpTimer) clearInterval(state.totpTimer);
     state.totpTimer = null;
     state.currentTotpCode = '';
   }
 
+  // Каждую секунду пересчитываем код и обновляем кружок-таймер.
   function startTotp(entry) {
     stopTotp();
     if (!entry || !entry.totp) return;
@@ -515,6 +584,10 @@
 
   /* ------------------------------ Редактор ------------------------------ */
 
+  /* --- 6. Редактор записи -------------------------------------------- */
+
+  // В редакторе показываем только поля выбранного типа:
+  // у карты нет логина/TOTP, у заметки нет пароля.
   function updateTypeVisibility(type) {
     const login = $('#login-fields');
     const card = $('#card-fields');
@@ -522,6 +595,7 @@
     if (card) card.hidden = type !== 'card';
   }
 
+  // Рисуем 4 полоски надёжности и подпись (слабый/надёжный/отличный).
   function paintStrength(container, labelNode, entropyNode, password) {
     if (!container) return;
     const result = KeyGuardGenerator.estimateStrength(password);
@@ -533,9 +607,11 @@
     return result;
   }
 
+  // Открыть редактор. entry = null означает «новая запись».
+  // prefill используется, когда пароль пришёл из генератора.
   function openEditor(entry = null, prefill = null) {
     closeModal();
-    state.editingEntryId = entry?.id || null;
+    state.editingEntryId = entry?.id || null;  // запоминаем, что редактируем
     const isNew = !entry;
     const data = entry || {
       type: 'login',
@@ -653,12 +729,12 @@
     updateTypeVisibility(data.type);
     paintStrength($('#entry-strength'), $('#entry-strength-label'), $('#entry-entropy'), data.password);
 
-    $('#entry-type').addEventListener('change', (event) => updateTypeVisibility(event.target.value));
+    $('#entry-type').addEventListener('change', (event) => updateTypeVisibility(event.target.value));  // при смене типа показываем другие поля
     $('#entry-password').addEventListener('input', (event) => {
       paintStrength($('#entry-strength'), $('#entry-strength-label'), $('#entry-entropy'), event.target.value);
       $('#breach-result').textContent = '';
     });
-    $('#entry-generate').addEventListener('click', () => {
+    $('#entry-generate').addEventListener('click', () => {  // кнопка «сгенерировать пароль»
       const password = KeyGuardGenerator.generatePassword(state.settings?.generator || {});
       $('#entry-password').value = password;
       $('#entry-password').type = 'text';
@@ -667,7 +743,7 @@
       paintStrength($('#entry-strength'), $('#entry-strength-label'), $('#entry-entropy'), password);
       toast('Пароль сгенерирован');
     });
-    if ($('#entry-breach')) $('#entry-breach').addEventListener('click', async () => {
+    if ($('#entry-breach')) $('#entry-breach').addEventListener('click', async () => {  // кнопка проверки утечек
       const password = $('#entry-password').value;
       const resultNode = $('#breach-result');
       if (!password) {
@@ -696,6 +772,8 @@
     }, 60);
   }
 
+  // Собрать данные из формы и отправить в background.
+  // background сам решит: добавить новую запись или обновить существующую.
   async function saveEditor() {
     const type = $('#entry-type').value;
     const title = $('#entry-title').value.trim();
@@ -723,10 +801,10 @@
       favorite: $('#entry-favorite').checked
     };
 
-    const button = $('#entry-save');
+    const button = $('#entry-save');  // блокируем кнопку, чтобы не сохранить дважды
     button.disabled = true;
     try {
-      const response = await send('UPSERT_ENTRY', { entry: payload });
+      const response = await send('UPSERT_ENTRY', { entry: payload });  // сохраняем через service worker
       state.entries = response.entries;
       closeModal();
       renderEntries();
@@ -746,6 +824,10 @@
 
   /* ----------------------------- Генератор ------------------------------ */
 
+  /* --- 7. Генератор паролей ------------------------------------------ */
+
+  // Модальное окно генератора. Настройки берём из state.settings,
+  // но меняем только локальную копию — сохраняются они на странице options.
   function openGenerator() {
     closeModal();
     state.generatorOptions = { ...(state.settings?.generator || {}) };
@@ -820,7 +902,7 @@
       $('#gen-length-value').textContent = lengthInput.value;
     };
 
-    const regenerate = () => {
+    const regenerate = () => {  // пересчитать пароль при любом изменении настроек
       syncOptions();
       state.generatorPassword = KeyGuardGenerator.generatePassword(state.generatorOptions);
       $('#gen-password').textContent = state.generatorPassword;
@@ -830,8 +912,8 @@
     lengthInput.addEventListener('input', regenerate);
     $$('[data-gen-option]').forEach((input) => input.addEventListener('change', regenerate));
     $('#gen-refresh').addEventListener('click', regenerate);
-    $('#gen-copy').addEventListener('click', () => copyText(state.generatorPassword, 'Пароль скопирован'));
-    $('#gen-use').addEventListener('click', () => {
+    $('#gen-copy').addEventListener('click', () => copyText(state.generatorPassword, 'Пароль скопирован'));  // копируем сгенерированный пароль
+    $('#gen-use').addEventListener('click', () => {  // создать запись с этим паролем
       const password = state.generatorPassword;
       closeModal();
       openEditor(null, { password });
@@ -845,6 +927,7 @@
 
   /* ------------------------------ Подтверждение ------------------------- */
 
+  /* --- 8. Подтверждение и удаление ----------------------------------- */
   function confirmDialog({ title, text, confirmLabel = 'Удалить', onConfirm }) {
     closeModal();
     const overlay = document.createElement('div');
@@ -878,6 +961,7 @@
     });
   }
 
+  // Удаление записи с подтверждением.
   async function deleteCurrentEntry() {
     const entry = state.currentEntry;
     if (!entry) return;
@@ -901,8 +985,12 @@
 
   /* ------------------------------- События ------------------------------- */
 
+  /* --- 9. Обработчики событий ---------------------------------------- */
+
+  // Здесь собраны все клики и формы. Логика вынесена в функции выше,
+  // поэтому обработчики короткие и их легко читать.
   function bindEvents() {
-    $('#unlock-form').addEventListener('submit', async (event) => {
+    $('#unlock-form').addEventListener('submit', async (event) => {  // вход по мастер-паролю
       event.preventDefault();
       const password = $('#master-password').value;
       const errorNode = $('#unlock-error');
@@ -929,7 +1017,7 @@
       }
     });
 
-    $('#create-form').addEventListener('submit', async (event) => {
+    $('#create-form').addEventListener('submit', async (event) => {  // создание нового хранилища
       event.preventDefault();
       const password = $('#new-password').value;
       const confirm = $('#new-password-confirm').value;
@@ -984,7 +1072,7 @@
       paintStrength($('#new-strength'), $('#new-strength-label'), $('#new-entropy'), event.target.value);
     });
 
-    $('#filter-chips').addEventListener('click', (event) => {
+    $('#filter-chips').addEventListener('click', (event) => {  // переключение категорий
       const chip = event.target.closest('[data-filter]');
       if (!chip) return;
       state.filter = chip.dataset.filter;
@@ -1002,7 +1090,7 @@
       }, 120);
     });
 
-    $('#entries-list').addEventListener('click', async (event) => {
+    $('#entries-list').addEventListener('click', async (event) => {  // клик по записи или по кнопке копирования
       const actionButton = event.target.closest('[data-action]');
       const entryNode = event.target.closest('.entry');
       if (!entryNode) return;
@@ -1028,11 +1116,11 @@
       openDetail(entryNode.dataset.id);
     });
 
-    $('#btn-add').addEventListener('click', () => openEditor());
+    $('#btn-add').addEventListener('click', () => openEditor());  // новая запись
     $('#empty-add').addEventListener('click', () => openEditor());
     $('#btn-generator').addEventListener('click', openGenerator);
     $('#btn-options').addEventListener('click', () => chrome.runtime.openOptionsPage());
-    $('#btn-lock').addEventListener('click', async () => {
+    $('#btn-lock').addEventListener('click', async () => {  // заблокировать хранилище
       await send('LOCK');
       state.unlocked = false;
       state.entries = [];
@@ -1050,7 +1138,7 @@
     $('#btn-detail-edit').addEventListener('click', () => {
       if (state.currentEntry) openEditor(state.currentEntry);
     });
-    $('#btn-detail-delete').addEventListener('click', deleteCurrentEntry);
+    $('#btn-detail-delete').addEventListener('click', deleteCurrentEntry);  // удалить запись
     $('#btn-detail-favorite').addEventListener('click', async () => {
       if (!state.currentEntry) return;
       try {
@@ -1064,7 +1152,7 @@
       }
     });
 
-    $('#detail-body').addEventListener('click', async (event) => {
+    $('#detail-body').addEventListener('click', async (event) => {  // копирование и раскрытие полей
       const copyButton = event.target.closest('[data-copy-field]');
       if (copyButton) {
         const value = getFieldValue(copyButton.dataset.copyField);
@@ -1145,6 +1233,10 @@
     });
   }
 
+  /* --- 10. Активность и запуск --------------------------------------- */
+
+  // Сообщаем background, что пользователь активен. Не чаще раза в 4 секунды,
+  // чтобы не заваливать service worker сообщениями.
   function touchActivity() {
     const now = Date.now();
     if (now - state.lastTouch < 4000) return;
@@ -1153,13 +1245,15 @@
     send('PING', { touch: true }).catch(() => {});
   }
 
+  // Точка входа: подписываемся на события и загружаем состояние.
   function init() {
     bindEvents();
     refreshState();
-    setInterval(() => {
+    setInterval(() => {  // раз в 20 секунд проверяем, не заблокировалось ли хранилище
       if (state.unlocked) send('PING').catch(() => {});
     }, 20000);
   }
 
+  // Стартуем после того, как DOM загрузился (скрипт подключён в конце body).
   init();
 })();

@@ -6,10 +6,27 @@
 (() => {
   'use strict';
 
-  const LOCAL_KEY = 'keyguard_vault_v1';
-  const SESSION_KEY = 'keyguard_session_key_v1';
-  const SETTINGS_KEY = 'keyguard_settings_v1';
+  /* =====================================================================
+     КАК ЧИТАТЬ ЭТОТ ФАЙЛ
+     ---------------------------------------------------------------------
+     Здесь только работа с chrome.storage. Никакой криптографии:
+     1. Ключи local/session и настройки по умолчанию.
+     2. Обёртки, которые превращают callback-стиль Chrome в Promise.
+     3. Функции для сохранения/чтения хранилища, ключа и настроек.
 
+     local — это диск (зашифрованный конверт).
+     session — это память (ключ на время работы).
+     ===================================================================== */
+  'use strict';
+
+  /* --- Что где хранится --------------------------------------------- */
+
+  // Зашифрованный конверт: соль, verifier, IV и шифротекст.
+  const LOCAL_KEY = 'keyguard_vault_v1';  // зашифрованный конверт
+  const SESSION_KEY = 'keyguard_session_key_v1';  // ключ в памяти браузера
+  const SETTINGS_KEY = 'keyguard_settings_v1';  // настройки (не секретные)
+
+  // Настройки по умолчанию. Их можно менять на странице options.
   const DEFAULT_SETTINGS = {
     autoLockMinutes: 5,
     clipboardClearSeconds: 30,
@@ -25,10 +42,17 @@
     }
   };
 
+  /* --- Обёртки над chrome.storage ----------------------------------- */
+
+  // В тестах или вне расширения chrome.storage может не быть.
+  // Поэтому каждая обёртка проверяет его наличие и аккуратно возвращает
+  // undefined, а не падает.
   function hasChromeStorage() {
     return typeof chrome !== 'undefined' && chrome && chrome.storage;
   }
 
+  // Chrome storage работает через callback. Оборачиваем в Promise,
+  // чтобы в остальном коде можно было писать await.
   function localGet(key) {
     return new Promise((resolve) => {
       if (!hasChromeStorage() || !chrome.storage.local) return resolve(undefined);
@@ -71,6 +95,9 @@
     });
   }
 
+  /* --- Функции для хранилища ---------------------------------------- */
+
+  // Получить/сохранить/проверить существование зашифрованного конверта.
   async function getVaultRecord() {
     return (await localGet(LOCAL_KEY)) || null;
   }
@@ -96,13 +123,17 @@
     await sessionRemove(SESSION_KEY);
   }
 
+  /* --- Настройки ---------------------------------------------------- */
+
+  // Читаем настройки и накладываем их на значения по умолчанию.
+  // Так новые версии расширения получают все нужные поля.
   async function getSettings() {
     const stored = await localGet(SETTINGS_KEY);
     return {
       ...DEFAULT_SETTINGS,
       ...(stored || {}),
       generator: { ...DEFAULT_SETTINGS.generator, ...((stored || {}).generator || {}) }
-    };
+    };  // мержим с настройками по умолчанию
   }
 
   async function setSettings(settings) {
@@ -116,12 +147,20 @@
     return next;
   }
 
+  /* --- Полный сброс -------------------------------------------------- */
+
+  // Удаляем конверт, настройки и ключ из session.
+  // Используется в «опасной зоне» на странице настроек.
   async function resetAll() {
     await localRemove(LOCAL_KEY);
     await localRemove(SETTINGS_KEY);
     await clearSessionKey();
   }
 
+  /* --- Что отдаём наружу --------------------------------------------- */
+
+  // background и тесты используют эти функции через
+  // globalThis.KeyGuardStorage.
   globalThis.KeyGuardStorage = {
     LOCAL_KEY,
     SESSION_KEY,
