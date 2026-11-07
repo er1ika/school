@@ -4,17 +4,38 @@
 (() => {
   'use strict';
 
+  /* =====================================================================
+     КАК ЧИТАТЬ ЭТОТ ФАЙЛ
+     ---------------------------------------------------------------------
+     options.js — страница настроек, которая открывается в отдельной вкладке.
+     1. Утилиты и общение с background.
+     2. Вкладки и состояние (разблокировано / заблокировано).
+     3. Безопасность: автоблокировка, буфер обмена, смена мастер-пароля.
+     4. Генератор: настройки по умолчанию и превью пароля.
+     5. Аудит: слабые, повторные и старые пароли.
+     6. Данные: экспорт, импорт и удаление хранилища.
+
+     Страница не хранит пароли: она просит записи у background,
+     анализирует их в памяти и забывает при закрытии.
+     ===================================================================== */
+
+  /* --- 1. Утилиты ---------------------------------------------------- */
+
+  // $ и $$ — короткие обёртки для поиска элементов.
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
+  // Состояние страницы: есть ли хранилище, разблокировано ли,
+  // какие настройки загружены и какой файл ждёт импорта.
   const state = {
     hasVault: false,
     unlocked: false,
-    settings: null,
-    generatorOptions: null,
-    pendingImport: null
+    settings: null,  // настройки из background
+    generatorOptions: null,  // текущие настройки генератора
+    pendingImport: null  // резервная копия, ожидающая пароль
   };
 
+  // Цвета аватарок — те же, что в попапе, чтобы аудит выглядел знакомо.
   const GRADIENTS = [
     'linear-gradient(135deg, #8b5cf6, #6366f1)',
     'linear-gradient(135deg, #06b6d4, #3b82f6)',
@@ -26,6 +47,7 @@
     'linear-gradient(135deg, #14b8a6, #84cc16)'
   ];
 
+  // Значения генератора по умолчанию (если настройки ещё не сохранены).
   const DEFAULT_GENERATOR = {
     length: 20,
     lower: true,
@@ -37,12 +59,14 @@
 
   /* ------------------------------ Утилиты ------------------------------- */
 
+  // Экранирование перед вставкой в innerHTML.
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, (char) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[char]));
   }
 
+  // Хеш строки → стабильный цвет аватарки.
   function hashString(value) {
     let hash = 0;
     for (let i = 0; i < String(value).length; i += 1) {
@@ -51,14 +75,17 @@
     return hash;
   }
 
+  // CSS для аватарки.
   function avatarStyle(title) {
     return `background: ${GRADIENTS[hashString(title) % GRADIENTS.length]}`;
   }
 
+  // Первая буква названия.
   function avatarLetter(title) {
     return (String(title || '?').trim()[0] || '?').toUpperCase();
   }
 
+  // Уведомление внизу страницы.
   function toast(message, type = '') {
     const node = document.createElement('div');
     node.className = `toast ${type}`.trim();
@@ -67,6 +94,7 @@
     setTimeout(() => node.remove(), 2800);
   }
 
+  // Мостик к background: callback → Promise, ошибки → throw.
   function send(type, payload = {}) {
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ type, ...payload }, (response) => {
@@ -79,6 +107,7 @@
     });
   }
 
+  // Копирование в буфер и планирование его очистки.
   async function copyText(text, label = 'Скопировано') {
     if (!text) return;
     try {
@@ -107,10 +136,13 @@
     }
   }
 
+  // Закрыть модальное окно.
   function closeModal() {
     $('#modal-root').innerHTML = '';
   }
 
+  // Открыть модальное окно с произвольным HTML.
+  // Возвращаем overlay, чтобы вызывающий код мог навесить обработчики.
   function openModal(contentHtml) {
     closeModal();
     const overlay = document.createElement('div');
@@ -130,6 +162,9 @@
 
   /* ------------------------------ Вкладки ------------------------------- */
 
+  /* --- 2. Вкладки и состояние ---------------------------------------- */
+
+  // Переключение разделов: Безопасность / Генератор / Аудит / Данные / О проекте.
   function initTabs() {
     $$('.nav [data-tab]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -143,6 +178,8 @@
 
   /* ------------------------------ Состояние ----------------------------- */
 
+  // Узнаём у background, разблокировано ли хранилище,
+  // и обновляем интерфейс под это состояние.
   async function refreshState() {
     try {
       const response = await send('GET_STATE');
@@ -160,6 +197,8 @@
     }
   }
 
+  // Показываем плашку статуса и баннер «хранилище заблокировано».
+  // Если хранилище закрыто, форма смены пароля отключается.
   function applyState() {
     const pill = $('#status-pill');
     const text = $('#status-text');
@@ -172,7 +211,7 @@
       text.textContent = 'Заблокировано';
     }
 
-    const banner = $('#locked-banner');
+    const banner = $('#locked-banner');  // баннер для заблокированного состояния
     banner.hidden = state.unlocked;
     if (!state.hasVault) {
       $('#locked-banner-text').textContent =
@@ -194,6 +233,7 @@
     applySettingsToControls();
   }
 
+  // Переносим настройки из state в элементы управления.
   function applySettingsToControls() {
     const settings = state.settings;
     if (!settings) return;
@@ -210,6 +250,9 @@
 
   /* --------------------------- Настройки безопасности -------------------- */
 
+  /* --- 3. Безопасность ----------------------------------------------- */
+
+  // Сохраняем только изменённые поля, остальные не трогаем.
   async function saveSettings(partial) {
     try {
       const response = await send('SET_SETTINGS', { settings: partial });
@@ -220,14 +263,15 @@
     }
   }
 
+  // Подписки на все элементы раздела «Безопасность».
   function initSecurity() {
-    $('#auto-lock').addEventListener('change', (event) => {
+    $('#auto-lock').addEventListener('change', (event) => {  // автоблокировка по таймеру
       saveSettings({ autoLockMinutes: Number(event.target.value) });
     });
-    $('#lock-on-idle').addEventListener('change', (event) => {
+    $('#lock-on-idle').addEventListener('change', (event) => {  // блокировка при простое системы
       saveSettings({ lockOnIdle: event.target.checked });
     });
-    $('#clipboard-clear').addEventListener('change', (event) => {
+    $('#clipboard-clear').addEventListener('change', (event) => {  // очистка буфера обмена
       saveSettings({ clipboardClearSeconds: Number(event.target.value) });
     });
     $('#breach-check').addEventListener('change', (event) => {
@@ -253,7 +297,7 @@
       );
     });
 
-    $('#change-password-form').addEventListener('submit', async (event) => {
+    $('#change-password-form').addEventListener('submit', async (event) => {  // смена мастер-пароля
       event.preventDefault();
       const current = $('#current-password').value;
       const next = $('#new-password').value;
@@ -288,7 +332,7 @@
       const button = $('#change-submit');
       button.disabled = true;
       try {
-        await send('CHANGE_MASTER_PASSWORD', { currentPassword: current, newPassword: next });
+        await send('CHANGE_MASTER_PASSWORD', { currentPassword: current, newPassword: next });  // background перешифрует всё хранилище
         $('#current-password').value = '';
         $('#new-password').value = '';
         $('#new-password-confirm').value = '';
@@ -305,6 +349,7 @@
     });
   }
 
+  // Полоски надёжности нового пароля.
   function paintStrength(container, labelNode, entropyNode, password) {
     if (!container) return;
     const result = KeyGuardGenerator.estimateStrength(password);
@@ -317,6 +362,9 @@
 
   /* ------------------------------ Генератор ----------------------------- */
 
+  /* --- 4. Генератор -------------------------------------------------- */
+
+  // Записываем значения из state в элементы формы.
   function syncGeneratorControls() {
     const options = state.generatorOptions;
     if (!options) return;
@@ -331,6 +379,7 @@
     $('#gen-ambiguous').checked = Boolean(options.avoidAmbiguous);
   }
 
+  // Читаем значения из формы обратно в state.
   function readGeneratorControls() {
     state.generatorOptions = {
       length: Number($('#options-gen-length').value),
@@ -349,6 +398,7 @@
     $('#options-gen-length-value').textContent = String(state.generatorOptions.length);
   }
 
+  // Показываем пример пароля с текущими настройками.
   function generatePreview() {
     if (!state.generatorOptions) return;
     const password = KeyGuardGenerator.generatePassword(state.generatorOptions);
@@ -362,6 +412,7 @@
     return password;
   }
 
+  // Подписки на изменения в разделе «Генератор».
   function initGenerator() {
     const regenerate = () => {
       readGeneratorControls();
@@ -375,7 +426,7 @@
     $('#options-gen-copy').addEventListener('click', () => {
       copyText($('#options-gen-password').textContent, 'Пароль скопирован');
     });
-    $('#options-gen-save').addEventListener('click', async () => {
+    $('#options-gen-save').addEventListener('click', async () => {  // сохраняем настройки генератора в background
       readGeneratorControls();
       await saveSettings({ generator: state.generatorOptions });
     });
@@ -389,6 +440,9 @@
 
   /* -------------------------------- Аудит -------------------------------- */
 
+  /* --- 5. Аудит паролей ---------------------------------------------- */
+
+  // Сбрасываем результаты, если хранилище заблокировано или пустое.
   function clearAudit() {
     $('#stat-weak').textContent = '0';
     $('#stat-reused').textContent = '0';
@@ -404,6 +458,7 @@
     $('#list-old').innerHTML = '';
   }
 
+  // Одна строка результата: аватарка, название и причина.
   function auditItem(entry, reason) {
     return `
       <div class="audit-item">
@@ -414,6 +469,7 @@
     `;
   }
 
+  // Рисуем список находок или текст «всё хорошо».
   function renderAuditList(selector, entries, reasonFn, emptyText) {
     const node = $(selector);
     if (!entries.length) {
@@ -426,6 +482,11 @@
       .join('') + (entries.length > 25 ? `<p class="hint">и ещё ${entries.length - 25}…</p>` : '');
   }
 
+  // Главная функция аудита:
+  // 1) берём все логины с паролями;
+  // 2) считаем слабые (оценка 0–1 или популярный пароль);
+  // 3) группируем по значению пароля, чтобы найти повторы;
+  // 4) ищем пароли старше 180 дней.
   async function loadAudit() {
     try {
       const response = await send('GET_ENTRIES');
@@ -434,7 +495,7 @@
 
       const weak = [];
       const old = [];
-      const groups = new Map();
+      const groups = new Map();  // пароль → список записей с таким паролем
 
       for (const entry of logins) {
         const strength = KeyGuardGenerator.estimateStrength(entry.password);
@@ -442,7 +503,7 @@
           weak.push({ entry, reason: strength.label });
         }
         const age = KeyGuardGenerator.passwordAgeDays(entry.passwordUpdatedAt);
-        if (age > 180) old.push({ entry, reason: `${age} дней` });
+        if (age > 180) old.push({ entry, reason: `${age} дней` });  // порог «устаревшего» пароля — 180 дней
         const key = entry.password;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(entry);
@@ -481,6 +542,10 @@
 
   /* ----------------------------- Резервные копии ------------------------- */
 
+  /* --- 6. Данные: экспорт, импорт, сброс ----------------------------- */
+
+  // Скачиваем зашифрованный конверт как JSON-файл.
+  // В нём нет открытых паролей — только шифротекст.
   function downloadBackup() {
     if (!state.unlocked) {
       toast('Сначала разблокируйте хранилище', 'error');
@@ -503,6 +568,7 @@
       .catch((error) => toast(error.message, 'error'));
   }
 
+  // Импорт: просим мастер-пароль от копии и заменяем хранилище.
   function openImportModal(fileName) {
     openModal(`
       <div class="modal-head">
@@ -555,6 +621,7 @@
     }, 80);
   }
 
+  // Подписки на кнопки раздела «Данные».
   function initData() {
     $('#btn-export').addEventListener('click', downloadBackup);
     $('#import-file').addEventListener('change', async (event) => {
@@ -576,7 +643,7 @@
       }
     });
 
-    $('#btn-reset').addEventListener('click', () => {
+    $('#btn-reset').addEventListener('click', () => {  // удаление хранилища с подтверждением словом УДАЛИТЬ
       openModal(`
         <div class="modal-head">
           <h2>Удалить хранилище?</h2>
@@ -620,6 +687,10 @@
 
   /* ------------------------------- Служебное ----------------------------- */
 
+  /* --- 7. Служебное и запуск ----------------------------------------- */
+
+  // Пробуем открыть попап из вкладки настроек.
+  // Chrome разрешает это не всегда — тогда подсказываем нажать на иконку.
   async function openPopup() {
     try {
       if (chrome.action?.openPopup) {
@@ -632,6 +703,7 @@
     }
   }
 
+  // Точка входа страницы настроек.
   function init() {
     initTabs();
     initSecurity();

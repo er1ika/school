@@ -6,9 +6,28 @@
 (() => {
   'use strict';
 
-  if (window.__keyguardContentLoaded) return;
-  window.__keyguardContentLoaded = true;
+  /* =====================================================================
+     КАК ЧИТАТЬ ЭТОТ ФАЙЛ
+     ---------------------------------------------------------------------
+     content.js выполняется на каждой открытой странице сайта. Он умеет:
+     1. Находить поля логина и пароля в форме.
+     2. Заполнять их по команде из background.
+     3. Показывать баннер «Сохранить пароль?» после отправки формы.
+     4. Показывать небольшие уведомления (toast).
 
+     Важно: скрипт не читает пароли сам по себе. Он отправляет данные,
+     только когда пользователь отправил форму или нажал «Заполнить».
+     ===================================================================== */
+
+  // Защита от повторного внедрения: если скрипт уже загружен на странице
+  // (например, background внедрил его вручную), второй раз не запускаемся.
+  if (window.__keyguardContentLoaded) return;
+  window.__keyguardContentLoaded = true;  // флаг для повторных внедрений
+
+  /* --- Состояние страницы -------------------------------------------- */
+
+  // id контейнера, в котором живёт наш UI (shadow DOM),
+  // и ссылки на элементы баннера/тоста.
   const SHADOW_HOST_ID = '__keyguard_host__';
   let shadowHost = null;
   let shadowRoot = null;
@@ -17,11 +36,15 @@
   let pendingCredentials = null;
   let pendingExistingId = null;
   let toastTimer = null;
-  let changeTimer = null;
-  const lastSent = new Map();
+  let changeTimer = null;  // таймер, чтобы не спамить при вводе пароля
+  const lastSent = new Map();  // какие пароли уже отправляли, чтобы не предлагать дважды
 
-  /* ---------------------------- DOM helpers ---------------------------- */
+  /* ------------------------------------------------------------------ */
+  /* 1. Работа с полями формы                                           */
+  /* ------------------------------------------------------------------ */
 
+  // Некоторые сайты держат скрытые поля-ловушки для ботов.
+  // Проверяем, что поле реально видно пользователю.
   function isVisible(element) {
     if (!(element instanceof HTMLElement)) return false;
     const rect = element.getBoundingClientRect();
@@ -30,6 +53,9 @@
     return style.visibility !== 'hidden' && style.display !== 'none' && style.opacity !== '0';
   }
 
+  // Просто element.value = ... не всегда работает: React и Vue
+  // слушают событие input. Поэтому вызываем «родной» setter и
+  // отправляем события input/change.
   function setNativeValue(element, value) {
     const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
     if (descriptor && descriptor.set) descriptor.set.call(element, value);
@@ -38,6 +64,8 @@
     element.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  // Ищем первое видимое поле пароля. Если оно внутри <form>,
+  // предпочитаем именно такой вариант.
   function findPasswordField() {
     const fields = [...document.querySelectorAll('input[type="password"]')].filter(isVisible);
     if (fields.length === 0) return null;
@@ -45,6 +73,9 @@
     return inForm || fields[0];
   }
 
+  // Ищем поле логина рядом с полем пароля.
+  // Это не всегда input[type=email]: иногда это text с name="login".
+  // Поэтому каждому кандидату даём баллы по подсказкам в атрибутах.
   function findUsernameField(passwordField) {
     const form = passwordField?.closest('form');
     const scope = form || document;
@@ -55,7 +86,7 @@
       if (input.type === 'submit' || input.type === 'button') return false;
       return true;
     });
-    const score = (input) => {
+    const score = (input) => {  // чем больше баллов, тем больше похоже на логин
       const hint = `${input.name} ${input.id} ${input.autocomplete} ${input.placeholder} ${input.type}`.toLowerCase();
       let result = 0;
       if (/email|e-mail/.test(hint)) result += 6;
@@ -67,9 +98,10 @@
       if (input.type === 'text') result += 1;
       return result;
     };
-    return candidates.sort((a, b) => score(b) - score(a))[0] || null;
+    return candidates.sort((a, b) => score(b) - score(a))[0] || null;  // берём кандидата с максимальным баллом
   }
 
+  // Информация о форме для интерфейса: есть ли она и как называется.
   function getFormInfo() {
     const passwordField = findPasswordField();
     if (!passwordField) return { found: false };
@@ -86,6 +118,8 @@
     };
   }
 
+  // В форме смены пароля полей пароля несколько. Нам нужно именно
+  // новое поле, а не текущий пароль. Ищем по name/id new/confirm.
   function pickPasswordField(form) {
     const fields = [...form.querySelectorAll('input[type="password"]')].filter(
       (field) => isVisible(field) && field.value
@@ -97,6 +131,7 @@
     );
   }
 
+  // Собираем данные формы: домен, заголовок страницы, логин и пароль.
   function readCredentials(passwordField = findPasswordField()) {
     if (!passwordField) return null;
     const usernameField = findUsernameField(passwordField);
@@ -110,8 +145,13 @@
     };
   }
 
-  /* ------------------------------ Shadow UI ---------------------------- */
 
+  /* ------------------------------------------------------------------ */
+  /* 2. Интерфейс на странице (shadow DOM)                              */
+  /* ------------------------------------------------------------------ */
+
+  // Стили изолированы в shadow DOM, чтобы сайт не сломал наш баннер,
+  // а наши стили не сломали сайт.
   const SHADOW_STYLES = `
     :host { all: initial; }
     * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
@@ -156,6 +196,7 @@
     @keyframes kg-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   `;
 
+  // Создаём (один раз) контейнер со shadow root и стилями.
   function ensureShadow() {
     if (shadowHost && shadowRoot) return shadowRoot;
     shadowHost = document.getElementById(SHADOW_HOST_ID);
@@ -176,6 +217,7 @@
     return shadowRoot;
   }
 
+  // Убрать баннер и забыть несохранённые данные формы.
   function hidePrompt() {
     if (promptNode) {
       promptNode.remove();
@@ -185,6 +227,7 @@
     pendingExistingId = null;
   }
 
+  // Показать баннер. mode = 'save' (новая запись) или 'update'.
   function showPrompt(mode, data, credentials, existingId) {
     ensureShadow();
     hidePrompt();
@@ -257,6 +300,7 @@
     setTimeout(() => submit.focus(), 30);
   }
 
+  // Короткое уведомление вверху страницы.
   function showToast(text) {
     const root = ensureShadow();
     if (toastNode) toastNode.remove();
@@ -271,14 +315,18 @@
     }, 2600);
   }
 
+  // Экранируем HTML: название сайта может содержать < > и кавычки,
+  // а мы вставляем его в innerHTML.
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, (char) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[char]));
   }
 
-  /* ------------------------------ Filling ------------------------------ */
 
+  /* ------------------------------------------------------------------ */
+  /* 3. Заполнение формы                                                */
+  /* ------------------------------------------------------------------ */
   function fillEntry(entry) {
     const passwordField = findPasswordField();
     if (!passwordField) {
@@ -287,19 +335,21 @@
     }
     const usernameField = findUsernameField(passwordField);
     if (entry.username && usernameField) setNativeValue(usernameField, entry.username);
-    if (entry.password) setNativeValue(passwordField, entry.password);
+    if (entry.password) setNativeValue(passwordField, entry.password);  // подставляем пароль через «родной» setter
     passwordField.focus({ preventScroll: false });
-    showToast(entry.title ? `Заполнено: ${entry.title}` : 'Пароль подставлен');
+    showToast(entry.title ? `Заполнено: ${entry.title}` : 'Пароль подставлен');  // сообщаем пользователю, что сработало
     return { filled: true };
   }
 
-  /* --------------------------- Save detection -------------------------- */
 
+  /* ------------------------------------------------------------------ */
+  /* 4. Предложение сохранить пароль                                    */
+  /* ------------------------------------------------------------------ */
   function maybePrompt(credentials) {
     if (!credentials || !credentials.password) return;
     const key = `${credentials.origin}|${credentials.username}|${credentials.password}`;
     if (lastSent.has(key)) return;
-    lastSent.set(key, Date.now());
+    lastSent.set(key, Date.now());  // запоминаем, чтобы не спрашивать повторно
     if (lastSent.size > 40) {
       const oldest = lastSent.keys().next().value;
       lastSent.delete(oldest);
@@ -313,6 +363,7 @@
       .catch(() => {});
   }
 
+  // Пользователь отправил форму — можно предложить сохранить пароль.
   function handleSubmit(event) {
     const form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
@@ -322,6 +373,9 @@
     if (credentials) maybePrompt(credentials);
   }
 
+  // Пользователь изменил поле пароля (например, автозаполнение или ввод).
+  // Ждём 1,2 секунды после последнего изменения, чтобы не срабатывать
+  // на каждый символ.
   function handleChange(event) {
     const target = event.target;
     if (!(target instanceof HTMLInputElement) || target.type !== 'password') return;
@@ -334,21 +388,23 @@
     }, 1200);
   }
 
-  /* ------------------------------ Messages ----------------------------- */
 
+  /* ------------------------------------------------------------------ */
+  /* 5. Сообщения от background                                         */
+  /* ------------------------------------------------------------------ */
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     switch (message?.type) {
-      case 'KEYGUARD_GET_FORM':
+      case 'KEYGUARD_GET_FORM':  // спросить, есть ли на странице форма
         sendResponse(getFormInfo());
         break;
-      case 'KEYGUARD_FILL':
+      case 'KEYGUARD_FILL':  // заполнить форму данными
         sendResponse(fillEntry(message.entry || {}));
         break;
-      case 'KEYGUARD_TOAST':
+      case 'KEYGUARD_TOAST':  // показать уведомление из background
         showToast(message.text || '');
         sendResponse({ ok: true });
         break;
-      case 'KEYGUARD_CLEAR_CLIPBOARD':
+      case 'KEYGUARD_CLEAR_CLIPBOARD':  // очистить буфер обмена
         navigator.clipboard?.writeText('').catch(() => {});
         sendResponse({ ok: true });
         break;
@@ -362,8 +418,11 @@
     return true;
   });
 
-  document.addEventListener('submit', handleSubmit, true);
-  document.addEventListener('change', handleChange, true);
+  /* ------------------------------------------------------------------ */
+  /* 6. Подписки на события                                             */
+  /* ------------------------------------------------------------------ */
+  document.addEventListener('submit', handleSubmit, true);  // capture=true: ловим submit даже если сайт остановил его
+  document.addEventListener('change', handleChange, true);  // следим за изменением поля пароля
 
   window.addEventListener('pagehide', () => {
     clearTimeout(changeTimer);
